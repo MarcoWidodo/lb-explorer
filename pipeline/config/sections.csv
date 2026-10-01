@@ -1,0 +1,130 @@
+wave,q_from,section
+1,1,Economic Evaluations
+1,7,Trust in Institutions
+1,22,Social Capital
+1,27,Participation in Elections
+1,32,Electoral Mobilization
+1,56,Psychological Involvement
+1,62,Partisanship
+1,64,Traditionalism
+1,73,Political Participation
+1,97,Meaning of Democracy
+1,98,Satisfaction with Government and Democracy
+1,99,Preference for Democracy
+1,104,Regime Evaluation
+1,117,Democratic Legitimacy
+1,126,Efficacy and Citizen Empowerment
+1,132,Authoritarian vs. Democratic Values
+1,140,Ideological Cleavage
+1,145,Beliefs
+2,1,Economic Evaluations
+2,7,Trust in Institutions
+2,20,Social Capital
+2,32,Human Security
+2,38,Participation in Elections
+2,44,Access to Public Services
+2,48,Psychological Involvement
+2,54,Partisanship
+2,56,Traditionalism
+2,66,Globalization
+2,70,Specific Statements (Agree/Disagree)
+2,79,Political Participation
+2,91,Meaning of Democracy
+2,92,Satisfaction with Government and Democracy
+2,103,Quality of Governance
+2,121,Democratic Legitimacy
+2,124,Specific Statements (Agree/Disagree)
+2,133,Authoritarian vs. Democratic Values
+2,142,Ideological Cleavage
+2,147,Citizenship
+2,156,International Relations
+3,1,Economic Evaluations
+3,7,Trust in Institutions
+3,20,Social Capital
+3,32,Participation in Elections
+3,38,Access to Public Services
+3,43,Psychological Involvement
+3,47,Partisanship
+3,49,Traditionalism
+3,64,Political Participation
+3,74,Regime Preference
+3,85,Meaning of Democracy
+3,89,Satisfaction with Government and Democracy
+3,96,Most Important Problems
+3,98,Quality of Governance
+3,120,Regime Evaluation
+3,124,Democratic Legitimacy
+3,129,Specific Statements (Agree/Disagree)
+3,149,Globalization
+3,154,Citizenship
+3,156,International Relations
+4,1,Economic Evaluations
+4,7,Trust in Institutions
+4,20,Social Capital
+4,33,Participation in Elections
+4,39,Access to Public Services
+4,44,Psychological Involvement
+4,47,Internet and Social Media
+4,53,Partisanship
+4,55,Traditionalism
+4,69,Political Participation
+4,79,Regime Preference
+4,88,Meaning of Democracy
+4,92,Satisfaction with Government and Democracy
+4,99,Most Important Problems
+4,101,Quality of Governance
+4,121,Regime Evaluation
+4,125,Democratic Legitimacy
+4,130,Specific Statements (Agree/Disagree)
+4,150,Globalization
+4,155,Redistribution
+4,161,Citizenship
+4,163,International Relations
+5,1,Economic Evaluations
+5,7,Trust in Institutions
+5,18,Social Capital
+5,33,Participation in Elections
+5,39,Access to Public Services
+5,46,Psychological Involvement
+5,49,Internet and Social Media
+5,56,Partisanship
+5,58,Traditionalism
+5,70,Political Participation
+5,82,Regime Preference
+5,91,Meaning of Democracy
+5,99,Satisfaction with Government and Democracy
+5,106,Most Important Problems
+5,108,Quality of Governance
+5,128,Regime Evaluation
+5,132,Democratic Legitimacy
+5,137,Specific Statements (Agree/Disagree)
+5,156,Globalization
+5,159,Redistribution
+5,166,Citizenship
+5,168,Democratic Deconsolidation
+5,174,International Relations
+6,1,Economic Evaluations
+6,7,Trust in Institutions
+6,18,Social Capital
+6,33,Participation in Elections
+6,39,Access to Public Services
+6,47,Psychological Involvement
+6,50,Internet and Social Media
+6,54,Partisanship
+6,56,Traditionalism
+6,68,Political Participation
+6,80,Regime Preference
+6,85,Meaning of Democracy
+6,90,Satisfaction with Government and Democracy
+6,97,Most Important Problems
+6,99,Quality of Governance
+6,120,Regime Evaluation
+6,124,Democratic Legitimacy
+6,132,Specific Statements (Agree/Disagree)
+6,138,COVID-19
+6,146,Specific Statements (Agree/Disagree)
+6,156,Globalization
+6,159,Redistribution
+6,166,Citizenship
+6,168,Democratic Deconsolidation
+6,173,International Relations

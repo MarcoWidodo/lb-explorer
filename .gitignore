@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.Rhistory
+.RData
+.Rproj.user/
+pipeline/build_site_data.html
+pipeline/build_site_data_files/
+# never commit microdata
+*.sav
+*.zsav
+*.dta
+*.rds

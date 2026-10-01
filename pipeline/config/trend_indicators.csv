@@ -1,0 +1,5 @@
+harmonized_id,success_codes,allow_mean,note
+dem_preference,1,FALSE,"% saying democracy is always preferable (the standard headline). The three answers are not an ordered scale, so no mean."
+dem_confidence,1,TRUE,"% saying democracy is capable of solving the problems of our society"
+public_svc_police,1;2,TRUE,"% saying it is easy or very easy to get help from the police"
+party_closeness,2;3,TRUE,"% feeling somewhat or very close to their party (among partisans)"

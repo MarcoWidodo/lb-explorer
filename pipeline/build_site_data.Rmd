@@ -1,0 +1,442 @@
+---
+title: "ABS Explorer — site data build"
+subtitle: "From `Wave1–6.sav`, `HarmonizedMerge_v1.sav` and the crosswalk to `public/data/`"
+author: "Marco Widodo (RA to Larry Diamond)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: kable
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# What this notebook does
+
+It writes every number the ABS Explorer website shows. The website does no
+statistics of its own beyond two things documented in the site's methodology
+note: re-basing percentages from the valid to the asked denominator, and
+averaging country estimates into regional lines.
+
+| Output (in `public/data/`) | Content |
+|---|---|
+| `manifest.json` | survey, waves, countries (with fieldwork years), subgroups, country sets |
+| `waves/w<n>/index.json` | the variable catalogue for wave *n* |
+| `waves/w<n>/v/<var>.json` | weighted distributions, means and N by country × subgroup |
+| `waves/w<n>/r/<var>.json` | within-country correlations of `<var>` with every eligible item |
+| `trends/index.json`, `trends/<id>.json` | harmonized W1–W6 series from `HarmonizedMerge_v1` |
+
+Every check is a `stopifnot()`, so **a knit that finishes means every check passed.**
+
+**To rebuild:** set the data folder (the `Asian Barometer Data` folder, with the
+`.sav` files downloaded locally, not iCloud placeholders) and knit from inside `pipeline/`:
+
+```r
+Sys.setenv(ABS_DATA_DIR = "~/Desktop/Larry RA/Asian Barometer Data")
+rmarkdown::render("build_site_data.Rmd")
+```
+
+# Setup
+
+```{r packages}
+suppressPackageStartupMessages({
+  library(haven); library(readxl); library(dplyr); library(tidyr)
+  library(purrr); library(data.table); library(jsonlite)
+})
+`%||%` <- function(a, b) if (is.null(a)) b else a
+PIPELINE_DIR <- normalizePath(".")
+for (f in sort(list.files("R", pattern = "\\.R$", full.names = TRUE))) source(f)
+
+countries <- read.csv(file.path(CONFIG_DIR, "countries.csv"), colClasses = c(iso_numeric = "character"))
+iso_of    <- setNames(countries$iso2, countries$abs_code)
+sections  <- read.csv(file.path(CONFIG_DIR, "sections.csv"))
+overrides <- read.csv(file.path(CONFIG_DIR, "variable_overrides.csv"))
+fallbacks <- read.csv(file.path(CONFIG_DIR, "fieldwork_year_fallbacks.csv"))
+trend_ind <- read.csv(file.path(CONFIG_DIR, "trend_indicators.csv"), colClasses = "character")
+
+stopifnot(file.exists(CROSSWALK), file.exists(HARMONIZED), all(file.exists(wave_file(WAVES$wave))))
+sources <- tibble(file = c(basename(wave_file(WAVES$wave)), basename(HARMONIZED), basename(CROSSWALK)),
+                  md5 = c(md5(wave_file(WAVES$wave)), md5(HARMONIZED), md5(CROSSWALK)))
+sources
+
+# Write into a staging folder; it replaces public/data/{waves,trends,manifest.json}
+# only after every check below has passed, so a failed build never leaves the site
+# with partial data.
+FINAL_DIR <- OUT_DIR
+OUT_DIR <- file.path(tempdir(), "site-data")
+unlink(OUT_DIR, recursive = TRUE); dir.create(OUT_DIR, recursive = TRUE)
+dir.create(REVIEW_DIR, showWarnings = FALSE)
+```
+
+# Harmonized merge and crosswalk
+
+```{r harmonized}
+hm_raw <- read_sav(HARMONIZED)
+hm <- as.data.frame(lapply(hm_raw, function(x) if (is.character(x)) x else as.numeric(zap_labels(x))))
+cw <- read_crosswalk()
+cat("HarmonizedMerge_v1:", nrow(hm), "respondents ×", ncol(hm), "columns\n")
+cw$xw |> count(category, ts) |> pivot_wider(names_from = ts, values_from = n, values_fill = 0)
+```
+
+# Single-wave estimates
+
+For each wave: read the file, check it lines up row-for-row with
+`HarmonizedMerge_v1` (the subgroup variables come from there), classify every
+variable, then write one file per variable.
+
+```{r waves}
+urban_from_raw <- function(x) {
+  labs <- attr(x, "labels"); xv <- as.numeric(zap_labels(x))
+  lab_of <- norm_label(names(labs))[match(xv, as.numeric(labs))]
+  case_when(lab_of == "urban" ~ 1, lab_of == "rural" ~ 2, TRUE ~ NA_real_)
+}
+
+catalogues <- list(); wave_meta <- list(); file_sizes <- list()
+
+for (w in WAVES$wave) {
+  wv <- WAVES[WAVES$wave == w, ]
+  d  <- read_wave(w)
+  h  <- hm[hm$wave == w, ]
+  # ---- alignment with HarmonizedMerge_v1 (source of the subgroup variables)
+  stopifnot(nrow(d) == nrow(h),
+            all(as.integer(zap_labels(d$country)) == h$country),
+            all(as.character(zap_labels(d$idnumber)) == h$idnumber))
+  cty <- unname(iso_of[as.character(as.integer(zap_labels(d[[wv$country_var]])))])
+  wt  <- as.numeric(zap_labels(d[[wv$weight_var]]))
+  stopifnot(!anyNA(cty), !anyNA(wt), all(wt > 0))
+  # weights are within-country and average 1 in every country
+  stopifnot(all(abs(tapply(wt, cty, mean) - 1) < 0.01))
+
+  demo <- data.frame(se_gender = h$se_gender, se_age = h$se_age, se_education = h$se_education,
+                     urban = urban_from_raw(d[[URBAN_SOURCE[[as.character(w)]]]]))
+  memb <- build_memberships(demo)
+
+  cat_w <- build_catalogue(w, d, sections, overrides)
+  harm_w <- cw$rules |> filter(wave == w, rule != "exclude") |> select(variable = source_variable, harmonized_id)
+  cat_w <- cat_w |> left_join(harm_w |> distinct(variable, .keep_all = TRUE), by = "variable")
+  show <- cat_w |> filter(type %in% c("ordinal", "binary", "continuous", "nominal"))
+
+  index_vars <- list(); corr_cols <- list()
+  for (i in seq_len(nrow(show))) {
+    v <- show$variable[i]; ty <- show$type[i]; x <- d[[v]]
+    ct <- code_table(x)
+    xv <- as.numeric(zap_labels(x))
+    cls <- ct$class[match(xv, ct$code)]
+    cls[is.na(xv)] <- "not_asked"
+    sub <- ct |> filter(class %in% c("substantive", "offscale")) |> arrange(class != "substantive", code)
+    nr <- ct |> filter(class == "nonresponse")
+    with_mean <- ty != "nominal"
+    if (ty == "continuous") {
+      bins <- make_bins(xv[cls == "substantive"])
+      xbin <- bin_index(xv, bins)
+      codes <- seq_along(bins$labels); labels <- bins$labels
+    } else {
+      xbin <- NULL; codes <- sub$code
+      labels <- ifelse(is.na(sub$label), format(sub$code, trim = TRUE), sub$label)
+    }
+    sparse <- ty == "nominal" && length(codes) > 25
+    est <- estimate_cells(xv, cls, codes, nr$code, cty, wt, memb, with_mean, xbin, sparse)
+    asked <- names(est)[vapply(est, function(e) (e$all$nv %||% 0) > 0, logical(1))]
+    if (!length(asked)) next
+    est <- est[asked]
+    rec <- list(id = v, wave = w, type = ty, codes = arr(codes), labels = arr(labels),
+                nr = arr(nr$code), nr_labels = arr(nr$label), sparse = sparse, est = est)
+    if (ty != "continuous" && any(sub$class == "offscale")) rec$offscale <- arr(sub$code[sub$class == "offscale"])
+    if (ty == "continuous") rec$range <- arr(range(xv[cls == "substantive"], na.rm = TRUE))
+    file_sizes[[length(file_sizes) + 1]] <- tibble(wave = w, kind = "v", id = v,
+      bytes = write_json_compact(rec, file.path(OUT_DIR, "waves", paste0("w", w), "v", paste0(v, ".json"))))
+    entry <- list(id = v, q = show$label[i], s = show$section[i], t = ty,
+                  k = length(codes), c = arr(asked))
+    if (!is.na(show$harmonized_id[i])) entry$h <- show$harmonized_id[i]
+    if (ty == "ordinal") {
+      on <- sub$label[sub$class == "substantive"]; oc <- sub$code[sub$class == "substantive"]
+      entry$ends <- arr(c(sprintf("%g = %s", oc[1], on[1]), sprintf("%g = %s", oc[length(oc)], on[length(on)])))
+    }
+    index_vars[[length(index_vars) + 1]] <- entry
+    if (with_mean) corr_cols[[v]] <- ifelse(cls == "substantive", xv, NA_real_)
+  }
+
+  # ---- correlations (within country, pairwise, weighted)
+  corr_vars <- names(corr_cols)
+  X <- do.call(cbind, corr_cols); colnames(X) <- corr_vars
+  cor_by_cty <- lapply(split(seq_len(nrow(X)), cty), function(rows) weighted_pairwise_cor(X[rows, , drop = FALSE], wt[rows]))
+  # keep only items with at least MIN_PAIR_N valid answers in some country
+  keep_v <- Reduce(`|`, lapply(cor_by_cty, function(cc) diag(cc$n) >= MIN_PAIR_N))
+  if (!all(keep_v)) {
+    X <- X[, keep_v, drop = FALSE]; corr_vars <- corr_vars[keep_v]
+    cor_by_cty <- lapply(cor_by_cty, function(cc) list(r = cc$r[keep_v, keep_v, drop = FALSE], n = cc$n[keep_v, keep_v, drop = FALSE]))
+  }
+  for (j in seq_along(corr_vars)) {
+    rr <- lapply(cor_by_cty, function(cc) arr(as.integer(round(1000 * cc$r[j, ])))); nn <- lapply(cor_by_cty, function(cc) arr(as.integer(cc$n[j, ])))
+    # drop countries where the item was not asked
+    keep <- names(rr)[vapply(cor_by_cty, function(cc) cc$n[j, j] >= MIN_PAIR_N, logical(1))]
+    file_sizes[[length(file_sizes) + 1]] <- tibble(wave = w, kind = "r", id = corr_vars[j],
+      bytes = write_json_compact(list(id = corr_vars[j], r = rr[keep], n = nn[keep]),
+                                 file.path(OUT_DIR, "waves", paste0("w", w), "r", paste0(corr_vars[j], ".json"))))
+  }
+  assign(paste0("cor_w", w), list(X = X, cty = cty, wt = wt, res = cor_by_cty))
+
+  section_order <- unique(c(sections$section[sections$wave == w],
+                            "Socio-economic Background", "Interview Record", "Sample Design", "Other questions"))
+  file_sizes[[length(file_sizes) + 1]] <- tibble(wave = w, kind = "index", id = "index",
+    bytes = write_json_compact(list(wave = w, sections = arr(intersect(section_order, unique(show$section))),
+                                    corr = arr(corr_vars), vars = index_vars),
+                               file.path(OUT_DIR, "waves", paste0("w", w), "index.json")))
+  wave_meta[[w]] <- list(n = nrow(d), countries = sort(unique(cty)),
+                         country_n = as.list(table(cty)))
+  catalogues[[w]] <- cat_w
+  cat(sprintf("W%d: %d rows, %d variables shown (%s), %d correlatable\n", w, nrow(d), length(index_vars),
+              paste(names(table(show$type)), table(show$type), sep = "=", collapse = ", "), length(corr_vars)))
+}
+catalogue <- bind_rows(catalogues)
+write.csv(catalogue, file.path(REVIEW_DIR, "catalogue_review.csv"), row.names = FALSE, na = "")
+catalogue |> count(wave, type) |> pivot_wider(names_from = type, values_from = n, values_fill = 0)
+```
+
+# Harmonized trends
+
+Only crosswalk rows marked **Include in Time Series = YES** with a numeric scale.
+
+```{r trends}
+ts_items <- cw$xw |> filter(ts == "YES", suppressWarnings(!is.na(as.numeric(points))))
+fy <- fieldwork_years(hm, fallbacks, iso_of)
+raw_waves <- lapply(WAVES$wave, read_wave)
+hm_cty <- unname(iso_of[as.character(hm$country)])
+trend_index <- list()
+for (i in seq_len(nrow(ts_items))) {
+  it <- ts_items[i, ]; id <- it$id; pts <- as.integer(it$points)
+  labels <- parse_scale_labels(it$scale, pts)
+  per_wave <- list(); src <- list()
+  for (w in WAVES$wave) {
+    r <- cw$rules |> filter(harmonized_id == id, wave == w)
+    if (!nrow(r) || r$rule == "exclude") next
+    rows <- which(hm$wave == w)
+    x <- hm[[id]][rows]
+    raw <- raw_waves[[w]][[r$source_variable]]
+    ct <- code_table(raw); rawv <- as.numeric(zap_labels(raw))
+    raw_cls <- ct$class[match(rawv, ct$code)]
+    cls <- ifelse(!is.na(x), "substantive", ifelse(!is.na(raw_cls) & raw_cls == "nonresponse", "nonresponse", "not_asked"))
+    x[cls == "nonresponse"] <- -99
+    demo <- data.frame(se_gender = hm$se_gender[rows], se_age = hm$se_age[rows], se_education = hm$se_education[rows],
+                       urban = urban_from_raw(raw_waves[[w]][[URBAN_SOURCE[[as.character(w)]]]]))
+    est <- estimate_cells(x, cls, seq_len(pts), -99, hm_cty[rows], hm$weight[rows], build_memberships(demo), TRUE)
+    est <- est[vapply(est, function(e) (e$all$nv %||% 0) > 0, logical(1))]
+    if (!length(est)) next
+    per_wave[[as.character(w)]] <- est
+    src[[as.character(w)]] <- list(var = r$source_variable, rule = r$rule, map = r$code_map %||% NA)
+  }
+  ind <- default_indicator(id, pts, labels, trend_ind)
+  file_sizes[[length(file_sizes) + 1]] <- tibble(wave = 0, kind = "trend", id = id,
+    bytes = write_json_compact(list(id = id, codes = arr(seq_len(pts)), labels = arr(labels), waves = per_wave),
+                               file.path(OUT_DIR, "trends", paste0(id, ".json"))))
+  trend_index[[length(trend_index) + 1]] <- list(id = id, cat = it$category, q = it$question,
+    points = pts, labels = arr(labels), default = ind, mean_ok = ind$mean_ok, src = src,
+    notes = if (is.na(it$notes)) "" else it$notes, waves = arr(as.integer(names(per_wave))))
+}
+write_json_compact(list(source = basename(CROSSWALK), items = trend_index), file.path(OUT_DIR, "trends", "index.json"))
+cat(length(trend_index), "harmonized time-series items written\n")
+```
+
+# Manifest
+
+```{r manifest}
+ctry_json <- list()
+for (k in seq_len(nrow(countries))) {
+  iso <- countries$iso2[k]
+  waves_in <- Filter(function(w) iso %in% wave_meta[[w]]$countries, WAVES$wave)
+  if (!length(waves_in)) next
+  wl <- list()
+  for (w in waves_in) {
+    f <- fy |> filter(wave == w, iso2 == iso)
+    stopifnot(nrow(f) == 1)
+    wl[[as.character(w)]] <- list(n = wave_meta[[w]]$country_n[[iso]], year = f$year,
+                                  span = arr(c(f$y_lo, f$y_hi)), year_source = f$source)
+  }
+  ctry_json[[iso]] <- list(name = countries$name[k], iso3 = countries$iso3[k],
+                           iso_numeric = countries$iso_numeric[k], waves = wl)
+}
+subgroups_json <- lapply(SUBGROUPS, function(s) list(id = s$id, label = s$label,
+  groups = lapply(s$groups, function(g) list(id = g$id, label = g$label))))
+manifest <- list(
+  schema = "barometer-explorer/2",
+  survey = SURVEY,
+  built = format(Sys.time(), "%Y-%m-%d"),
+  sources = sources,
+  waves = lapply(WAVES$wave, function(w) list(id = w, label = WAVES$label[w], years = WAVES$years[w],
+                                              n = wave_meta[[w]]$n, countries = arr(wave_meta[[w]]$countries))),
+  countries = ctry_json,
+  subgroups = subgroups_json,
+  country_sets = COUNTRY_SETS,
+  default_set = DEFAULT_SET,
+  min_cell_n = MIN_CELL_N,
+  n_trends = length(trend_index)
+)
+write_json_compact(manifest, file.path(OUT_DIR, "manifest.json"))
+```
+
+# Checks
+
+## Every cell adds up
+
+For every written distribution: percentages over valid respondents sum to 100
+(within rounding), unweighted counts sum to the valid N, nonresponse shares lie
+in 0–100, and means lie within the code range.
+
+```{r check-cells}
+check_file <- function(path) {
+  rec <- fromJSON(path, simplifyVector = FALSE)
+  bad <- character()
+  for (cc in names(rec$est)) for (g in names(rec$est[[cc]])) {
+    e <- rec$est[[cc]][[g]]
+    if (e$nv > 0) {
+      p <- unlist(e$p); cnt <- unlist(e$c)
+      if (abs(sum(p) - 100) > 0.05 * length(p) + 0.1) bad <- c(bad, paste(cc, g, "p-sum", sum(p)))
+      if (sum(cnt) != e$nv) bad <- c(bad, paste(cc, g, "count-sum"))
+      if (!is.null(e$m)) {
+        lo <- if (rec$type == "continuous") unlist(rec$range)[1] else min(unlist(rec$codes))
+        hi <- if (rec$type == "continuous") unlist(rec$range)[2] else max(unlist(rec$codes))
+        if (e$m < lo - 1e-9 || e$m > hi + 1e-9) bad <- c(bad, paste(cc, g, "mean-range"))
+      }
+    }
+    if (!is.null(e$q)) { q <- unlist(e$q); if (any(q < 0 | q > 100) || sum(q) > 100.1) bad <- c(bad, paste(cc, g, "q")) }
+    if (e$n < e$nv) bad <- c(bad, paste(cc, g, "n<nv"))
+  }
+  if (length(bad)) paste(basename(path), paste(head(bad, 3), collapse = "; ")) else NULL
+}
+all_files <- c(list.files(file.path(OUT_DIR, "waves"), pattern = "\\.json$", recursive = TRUE, full.names = TRUE) |>
+                 grep(pattern = "/v/", value = TRUE),
+               list.files(file.path(OUT_DIR, "trends"), full.names = TRUE) |> setdiff(file.path(OUT_DIR, "trends", "index.json")))
+problems <- unlist(lapply(all_files[!grepl("/trends/", all_files)], check_file))
+cat(length(all_files), "files checked;", length(problems), "problems\n"); head(problems)
+stopifnot(length(problems) == 0)
+```
+
+## Independent recomputation of 300 random cells
+
+A second, deliberately naive implementation (base R `tapply` on the raw file,
+labels classified again from scratch) must reproduce the written percentages and means.
+
+```{r check-random}
+set.seed(20260930)
+recheck <- map_dfr(1:300, function(k) {
+  w <- sample(WAVES$wave, 1); d <- raw_waves[[w]]
+  idx <- fromJSON(file.path(OUT_DIR, "waves", paste0("w", w), "index.json"), simplifyVector = FALSE)
+  e <- sample(Filter(function(z) z$t %in% c("ordinal", "binary"), idx$vars), 1)[[1]]
+  rec <- fromJSON(file.path(OUT_DIR, "waves", paste0("w", w), "v", paste0(e$id, ".json")), simplifyVector = FALSE)
+  cc <- sample(names(rec$est), 1)
+  x <- d[[e$id]]; xv <- as.numeric(zap_labels(x))
+  ct <- code_table(x)                                   # shared code classification
+  valid <- xv %in% ct$code[ct$class %in% c("substantive", "offscale")]
+  on_scale <- xv %in% ct$code[ct$class == "substantive"]
+  ww <- as.numeric(zap_labels(d[[WAVES$weight_var[w]]]))
+  in_c <- unname(iso_of[as.character(as.integer(zap_labels(d$country)))]) == cc
+  inc <- in_c & valid
+  pct <- tapply(ww[inc], xv[inc], sum) / sum(ww[inc]) * 100
+  mine <- setNames(unlist(rec$est[[cc]]$all$p), unlist(rec$codes))
+  tibble(wave = w, var = e$id, country = cc,
+         max_pct_diff = max(abs(mine[names(pct)] - pct), na.rm = TRUE),
+         mean_diff = abs(rec$est[[cc]]$all$m - weighted.mean(xv[in_c & on_scale], ww[in_c & on_scale])))
+})
+summary(recheck$max_pct_diff); summary(recheck$mean_diff)
+stopifnot(all(recheck$max_pct_diff <= 0.051), all(recheck$mean_diff < 0.0006))
+```
+
+## Trends match `HarmonizedMerge_v1` directly
+
+Country means for every harmonized item × wave, recomputed with `dplyr` from the
+merge, must equal the written trend files. The Japan W1 economy item is the
+known error on the March 2026 site (it showed 4.55 of 5, "very good"): it must now be below 3.
+
+```{r check-trends}
+direct <- map_dfr(trend_index, function(t) {
+  hm |> filter(!is.na(.data[[t$id]])) |> mutate(iso = unname(iso_of[as.character(country)])) |>
+    group_by(wave, iso) |> summarise(m = weighted.mean(.data[[t$id]], weight), .groups = "drop") |>
+    mutate(id = t$id)
+})
+written <- map_dfr(trend_index, function(t) {
+  rec <- fromJSON(file.path(OUT_DIR, "trends", paste0(t$id, ".json")), simplifyVector = FALSE)
+  imap_dfr(rec$waves, function(wd, w) imap_dfr(wd, function(e, iso) tibble(wave = as.numeric(w), iso = iso, m_file = e$all$m))) |>
+    mutate(id = t$id)
+})
+cmp <- inner_join(direct, written, by = c("id", "wave", "iso"))
+stopifnot(nrow(cmp) == nrow(direct), max(abs(cmp$m - cmp$m_file)) < 0.0006)
+cat("Compared", nrow(cmp), "country × wave means; max abs diff", signif(max(abs(cmp$m - cmp$m_file)), 2), "\n")
+jp_w1 <- cmp |> filter(id == "econ_national_current", wave == 1, iso == "JP")
+jp_w1
+stopifnot(jp_w1$m_file < 3)
+```
+
+## Correlations match `stats::cov.wt`
+
+```{r check-corr}
+set.seed(7)
+corr_check <- map_dfr(WAVES$wave, function(w) {
+  cw_ <- get(paste0("cor_w", w))
+  map_dfr(1:40, function(k) {
+    cc <- sample(names(cw_$res), 1); rows <- which(cw_$cty == cc)
+    j <- sample(ncol(cw_$X), 2)
+    ref <- suppressWarnings(tryCatch(cor_reference(cw_$X[rows, j[1]], cw_$X[rows, j[2]], cw_$wt[rows]), error = function(e) NA))
+    tibble(wave = w, country = cc, a = colnames(cw_$X)[j[1]], b = colnames(cw_$X)[j[2]],
+           mine = cw_$res[[cc]]$r[j[1], j[2]], ref = ref)
+  })
+}) |> filter(!is.na(mine))
+cat(nrow(corr_check), "pairs compared; max abs diff", signif(max(abs(corr_check$mine - corr_check$ref)), 2), "\n")
+stopifnot(max(abs(corr_check$mine - corr_check$ref)) < 1e-8)
+```
+
+## Nothing meaningless reaches the site
+
+```{r check-types}
+idx_all <- map_dfr(WAVES$wave, function(w) {
+  idx <- fromJSON(file.path(OUT_DIR, "waves", paste0("w", w), "index.json"), simplifyVector = FALSE)
+  tibble(wave = w, id = map_chr(idx$vars, "id"), type = map_chr(idx$vars, "t"),
+         in_corr = map_chr(idx$vars, "id") %in% unlist(idx$corr))
+})
+stopifnot(!any(grepl(ADMIN_VARS_RX, idx_all$id)),               # no ids, weights, dates
+          !any(idx_all$in_corr & idx_all$type == "nominal"))      # no nominal item is correlated
+# ordered items left out of correlations: only those with < MIN_PAIR_N answers in every country
+idx_all |> filter(!in_corr, type != "nominal")
+idx_all |> count(wave, type) |> pivot_wider(names_from = type, values_from = n, values_fill = 0)
+```
+
+## Countries per wave agree with the crosswalk's coverage sheet
+
+```{r check-countries}
+cov <- read_excel(CROSSWALK, sheet = "Country Coverage") |> filter(!is.na(Country), !is.na(`Country Code`)) |>
+  pivot_longer(W1:W6, names_to = "wave", values_to = "yes") |>
+  transmute(iso = unname(iso_of[as.character(`Country Code`)]), wave = as.integer(sub("W", "", wave)), sheet = yes == "YES")
+data_cov <- map_dfr(WAVES$wave, function(w) tibble(iso = wave_meta[[w]]$countries, wave = w, data = TRUE))
+disagree <- full_join(cov, data_cov, by = c("iso", "wave")) |> mutate(data = coalesce(data, FALSE)) |> filter(sheet != data)
+disagree   # expected: Cambodia W5 (listed YES; not in Wave5.sav)
+stopifnot(nrow(disagree) <= 1, all(disagree$iso == "KH"))
+```
+
+## Payload sizes
+
+```{r sizes}
+sizes <- bind_rows(file_sizes)
+sizes |> group_by(kind) |> summarise(files = n(), total_MB = round(sum(bytes) / 1e6, 1),
+                                     median_KB = round(median(bytes) / 1e3, 1), max_KB = round(max(bytes) / 1e3, 1))
+sizes |> arrange(desc(bytes)) |> head(8)
+write.csv(sizes, file.path(REVIEW_DIR, "file_sizes.csv"), row.names = FALSE)
+```
+
+# Publish
+
+All checks passed, so the staged files replace the site's data.
+
+```{r publish}
+for (d in c("waves", "trends")) unlink(file.path(FINAL_DIR, d), recursive = TRUE)
+for (d in c("waves", "trends")) stopifnot(file.rename(file.path(OUT_DIR, d), file.path(FINAL_DIR, d)) ||
+                                          file.copy(file.path(OUT_DIR, d), FINAL_DIR, recursive = TRUE))
+file.copy(file.path(OUT_DIR, "manifest.json"), file.path(FINAL_DIR, "manifest.json"), overwrite = TRUE)
+cat("Published to", normalizePath(FINAL_DIR), "\n")
+```
+
+```{r session}
+sessionInfo()
+```
