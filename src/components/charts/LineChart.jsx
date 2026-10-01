@@ -11,9 +11,12 @@ import Tooltip from './Tooltip'
  *   - x is the fieldwork year; waveIdx is the position of the wave in the item's wave list,
  *     used to break the line where a series skips a wave (no interpolation).
  * bands: [{ label, x0, x1 }] wave spans drawn along the top.
+ * xDomain: fixed [x0, x1] (otherwise fitted to the data); xTicks: labelled years;
+ * minorTicks: unlabelled tick marks (e.g. every survey year, so gap years show).
  */
 export default function LineChart({
   series, yDomain, yFormat, valueFormat, bands = [], showCI, printMode, svgRef, ariaLabel, height = 400,
+  xDomain, xTicks, minorTicks = [],
 }) {
   const [wrapRef, width] = useWidth()
   const uid = useUid('line')
@@ -26,13 +29,15 @@ export default function LineChart({
   const legH = legendHeight(legendItems, width - 20)
 
   const allX = series.flatMap(s => s.points.map(p => p.x)).concat(bands.flatMap(b => [b.x0, b.x1]))
-  const x0 = allX.length ? Math.min(...allX) - 0.8 : 2000
-  const x1 = allX.length ? Math.max(...allX) + 0.8 : 2024
+  const x0 = xDomain ? xDomain[0] : allX.length ? Math.min(...allX) - 0.8 : 2000
+  const x1 = xDomain ? xDomain[1] : allX.length ? Math.max(...allX) + 0.8 : 2024
   const m = { top: bands.length ? 34 : 14, right: 18, bottom: 34 + legH + 8, left: 50 }
   const H = height + legH
   const x = scaleLinear().domain([x0, x1]).range([m.left, width - m.right])
   const y = scaleLinear().domain(yDomain).range([H - m.bottom, m.top]).nice()
-  const xticks = x.ticks(Math.min(12, Math.floor(width / 70))).filter(t => Number.isInteger(t))
+  const xticks = xTicks
+    ? xTicks.filter((t, i) => t >= x0 && t <= x1 && (width > 560 || i % 2 === 0))
+    : x.ticks(Math.min(12, Math.floor(width / 70))).filter(t => Number.isInteger(t))
   const yticks = y.ticks(6)
   const font = printMode ? PRINT_FONT : 'var(--font-body)'
 
@@ -62,11 +67,12 @@ export default function LineChart({
     const { s, si, p } = best
     setTip({
       x: x(p.x), y: y(p.y), title: s.label,
-      subtitle: `${p.waveLabel ?? ''}${p.x ? ` · fieldwork ${p.yearLabel ?? p.x}` : ''}`,
+      subtitle: p.subtitle ?? `${p.waveLabel ?? ''}${p.x ? ` · fieldwork ${p.yearLabel ?? p.x}` : ''}`,
       rows: [
         { name: 'Value', value: valueFormat(p.y), color: printMode ? styles[si].stroke : s.color },
         ...(p.se != null ? [{ name: '95% CI', value: `${valueFormat(p.y - 1.96 * p.se)} – ${valueFormat(p.y + 1.96 * p.se)}` }] : []),
         ...(p.n != null ? [{ name: p.nLabel || 'N', value: p.n.toLocaleString('en-US') }] : []),
+        ...(p.extraRows || []),
       ],
       foot: p.note,
     })
@@ -90,6 +96,9 @@ export default function LineChart({
             <line x1={m.left} x2={width - m.right} y1={y(t)} y2={y(t)} stroke={AXIS.grid} strokeDasharray="3 3" />
             <text x={m.left - 8} y={y(t) + 4} textAnchor="end" {...AXIS.tick} fontFamily={printMode ? PRINT_FONT : 'var(--font-mono)'}>{yFormat(t)}</text>
           </g>
+        ))}
+        {minorTicks.filter(t => t >= x0 && t <= x1).map(t => (
+          <line key={`m${t}`} x1={x(t)} x2={x(t)} y1={H - m.bottom} y2={H - m.bottom + 3} stroke="var(--color-text-tertiary)" opacity={0.7} />
         ))}
         {xticks.map(t => (
           <g key={t}>

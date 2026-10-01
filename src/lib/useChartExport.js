@@ -26,6 +26,7 @@ export const capFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 export function questionText(entry) {
   if (!entry) return ''
   const q = capFirst(entry.q || '')
-  const isItem = q.length < 48 && !/[?:]$/.test(q.trim()) && !/^(how|what|which|do|did|does|are|is|in|to|would|have|has|when|where|who)\b/i.test(q)
+  // LB variable labels (ids like A_001_001) are complete titles already
+  const isItem = !/^[A-Z]_\d{3}/.test(entry.id || '') && q.length < 48 && !/[?:]$/.test(q.trim()) && !/^(how|what|which|do|did|does|are|is|in|to|would|have|has|when|where|who)\b/i.test(q)
   return isItem && entry.s && !/^(Socio-economic|Interview|Sample)/.test(entry.s) ? `${entry.s}: ${q}` : q
 }

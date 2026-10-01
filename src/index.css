@@ -26,14 +26,15 @@
   --chart-1: #5C7A5C; --chart-2: #B85C38; --chart-3: #4A7B8C; --chart-4: #8B6B4A;
   --chart-5: #7B5E7B; --chart-6: #C4956A; --chart-7: #5A6E5A; --chart-8: #9C5D5D;
 
-  /* Country colours: 16 well-separated hues in the site's muted, earthy register.
-     The five countries surveyed in every wave (JP, KR, MN, PH, TW) get the most distinct ones. */
-  --country-JP: #3D6F8E; --country-KR: #C0582F; --country-MN: #7E57A6;
-  --country-PH: #B8901A; --country-TW: #4E8A4E; --country-CN: #9E2F3A;
-  --country-HK: #2A8C82; --country-TH: #B5648F; --country-ID: #6B7F2A;
-  --country-SG: #D17F5B; --country-VN: #5B8FC7; --country-KH: #8C6239;
-  --country-MY: #3E4E8C; --country-MM: #A07AC0; --country-AU: #6F9E6F;
-  --country-IN: #C9A06B;
+  /* Country colours: 18 hues in the site's muted, earthy register. The 16 countries surveyed in
+     every year 1996-2024 (LB_SET_BAL16) get the 16 well-separated hues; the Dominican Republic
+     (from 2004) and Nicaragua (not 2023-24) get two neutral greys of different lightness. */
+  --country-AR: #3D6F8E; --country-MX: #C0582F; --country-CL: #7E57A6;
+  --country-CO: #B8901A; --country-BR: #4E8A4E; --country-PE: #9E2F3A;
+  --country-VE: #2A8C82; --country-EC: #B5648F; --country-BO: #6B7F2A;
+  --country-PY: #D17F5B; --country-UY: #5B8FC7; --country-GT: #8C6239;
+  --country-SV: #3E4E8C; --country-HN: #A07AC0; --country-CR: #6F9E6F;
+  --country-PA: #C9A06B; --country-DO: #7A8288; --country-NI: #3E3A36;
 
   --dock-bg: rgba(255, 255, 255, 0.72);
   --dock-border: rgba(0, 0, 0, 0.06);
@@ -60,12 +61,12 @@
   --chart-1: #6ECF97; --chart-2: #E8845A; --chart-3: #64B5F6; --chart-4: #DCB060;
   --chart-5: #BA8FD6; --chart-6: #F0A868; --chart-7: #80CBC4; --chart-8: #EF7070;
 
-  --country-JP: #6FA8D6; --country-KR: #E8845A; --country-MN: #B08FE0;
-  --country-PH: #E0C050; --country-TW: #7CC47C; --country-CN: #E0626E;
-  --country-HK: #5CCFC2; --country-TH: #E091BC; --country-ID: #A9BF5A;
-  --country-SG: #F0A585; --country-VN: #8DBDF0; --country-KH: #C99467;
-  --country-MY: #8494E0; --country-MM: #CDB0E8; --country-AU: #9CCB9C;
-  --country-IN: #E8C79A;
+  --country-AR: #6FA8D6; --country-MX: #E8845A; --country-CL: #B08FE0;
+  --country-CO: #E0C050; --country-BR: #7CC47C; --country-PE: #E0626E;
+  --country-VE: #5CCFC2; --country-EC: #E091BC; --country-BO: #A9BF5A;
+  --country-PY: #F0A585; --country-UY: #8DBDF0; --country-GT: #C99467;
+  --country-SV: #8494E0; --country-HN: #CDB0E8; --country-CR: #9CCB9C;
+  --country-PA: #E8C79A; --country-DO: #8C99A3; --country-NI: #D3CABE;
 
   --dock-bg: rgba(15, 20, 25, 0.82);
   --dock-border: rgba(255, 255, 255, 0.06);
@@ -2309,3 +2310,65 @@ a:hover { color: var(--color-accent-hover); }
   .wave-pill { min-width: 0; }
   .view-header-row { flex-direction: column; align-items: stretch; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   YEAR PICKER (24 survey years on a calendar strip; a select on narrow screens)
+   ═══════════════════════════════════════════════════════════ */
+.year-picker { display: flex; flex-direction: column; gap: 0.35rem; width: 100%; max-width: 860px; }
+.year-picker-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.year-picker-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.year-picker-value { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; color: var(--color-text); line-height: 1; }
+.year-picker-hint { font-size: 0.78rem; color: var(--color-text-tertiary); }
+.year-strip { display: flex; align-items: stretch; gap: 2px; width: 100%; }
+.year-cell {
+  flex: 1 1 0; min-width: 0; padding: 0.42rem 0 0.38rem; border: 1px solid var(--color-border); border-radius: 6px;
+  background: var(--color-bg-raised); color: var(--color-text-secondary); cursor: pointer;
+  font-family: var(--font-mono); font-size: 0.72rem; line-height: 1; text-align: center;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.year-cell:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-text); }
+.year-cell.active { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-bg-raised); font-weight: 700; }
+.year-cell:disabled { opacity: 0.32; cursor: not-allowed; background: transparent; }
+.year-gap { flex: 0 0 7px; align-self: center; height: 0; border-top: 2px dotted var(--color-text-tertiary); opacity: 0.6; }
+.year-select-wrap { display: none; max-width: 220px; }
+@media (max-width: 760px) {
+  .year-strip { display: none; }
+  .year-select-wrap { display: block; }
+}
+.view-header-stack { display: flex; flex-direction: column; gap: 1rem; }
+.preview-banner {
+  background: color-mix(in srgb, var(--chart-2) 12%, var(--color-bg)); color: var(--color-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--chart-2) 35%, transparent);
+  font-size: 0.8rem; text-align: center; padding: 0.4rem 1rem; line-height: 1.35;
+}
+.trend-break-note { font-size: 0.82rem; color: var(--color-text-secondary); margin: 0.25rem 0 0.5rem; }
+.detail-qn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 0.15rem 0.6rem; margin: 0.3rem 0 0.5rem; }
+.detail-qn { display: flex; gap: 0.45rem; align-items: baseline; font-size: 0.8rem; min-width: 0; }
+.detail-qn .detail-source-var { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Dense coverage grid (24 survey years) */
+.dot-matrix-scroll.dense { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; }
+.dot-matrix.dense { min-width: 560px; }
+.dot-matrix.dense .dot-matrix-col-header { padding: 0.5rem 0; border-right: none; }
+.dot-matrix.dense .dot-matrix-wave-num { font-size: 0.66rem; font-weight: 600; }
+.dot-matrix.dense .dot-matrix-cell { padding: 0.32rem 0; border-right: none; }
+.dot-matrix.dense .dot-matrix-dot { width: 9px; height: 9px; }
+.dot-matrix.dense .dot-matrix-dot.filled { box-shadow: none; }
+.dot-matrix.dense .dot-matrix-row-label { padding: 0.3rem 0.6rem; }
+.dot-matrix-gapcol { border-bottom: 1px solid var(--color-border);
+  background: repeating-linear-gradient(180deg, var(--color-border) 0 2px, transparent 2px 5px); opacity: 0.55; }
+.dot-matrix-gapcol.head { border-bottom: 2px solid var(--color-border); }
+.dot-matrix.dense .dot-matrix-tooltip { max-width: 300px; }
+.dot-matrix-legend { flex-wrap: wrap; }
+@media (max-width: 500px) {
+  .dot-matrix.dense { --dm-label: 64px; }
+}
+.about-quote { margin: 0.75rem 0; padding: 0.75rem 1rem; border-left: 3px solid var(--color-accent); background: var(--color-bg-subtle);
+  border-radius: 0 8px 8px 0; font-style: italic; color: var(--color-text); line-height: 1.55; }
+.about-quote-src { display: block; margin-top: 0.4rem; font-style: normal; font-size: 0.78rem; color: var(--color-text-tertiary); }
+.chip-search { width: 100%; margin: 0.5rem 0 0.35rem; padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-raised); color: var(--color-text); font-size: 0.85rem; }
+.about-table td { overflow-wrap: anywhere; }
+.about-table code { word-break: break-all; }
+.about-table.about-small td:nth-child(2) { white-space: normal; }
+@media (max-width: 640px) { .about-table.about-small td:first-child { white-space: normal; } }

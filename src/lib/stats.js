@@ -71,9 +71,14 @@ export function cellDistribution(cell, rec, base = 'valid') {
   return out
 }
 
-/** Equal-weight average of country values; null unless every member has a value. */
-export function regionValue(byCountry, members) {
-  const vals = members.map(m => byCountry[m])
+/**
+ * Equal-weight average of country values; null unless every member has a value
+ * (as lb_region()). With allowMissing (an unbalanced set), the average of the
+ * members that have a value; n_countries says how many.
+ */
+export function regionValue(byCountry, members, allowMissing = false) {
+  let vals = members.map(m => byCountry[m])
+  if (allowMissing) vals = vals.filter(v => v != null && v.value != null)
   if (!vals.length || vals.some(v => v == null || v.value == null)) return null
   const k = vals.length
   const value = vals.reduce((s, v) => s + v.value, 0) / k

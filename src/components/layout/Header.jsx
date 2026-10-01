@@ -8,6 +8,8 @@ export default function Header() {
   const { manifest } = useData()
   const s = manifest.survey
   return (
+    <>
+    {s.preview_notice && <div className="preview-banner" role="note">{s.preview_notice}</div>}
     <header className="app-header">
       <a href="#main" className="skip-link">Skip to content</a>
       <Link to="/" className="app-header-title"><h1>{s.name} Explorer</h1></Link>
@@ -20,5 +22,6 @@ export default function Header() {
         </button>
       </div>
     </header>
+    </>
   )
 }

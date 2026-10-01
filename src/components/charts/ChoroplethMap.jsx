@@ -22,11 +22,17 @@ export default function ChoroplethMap({ geo, values, isoByNumeric, countryName, 
   const [wrapRef, width] = useWidth()
   const uid = useUid('map')
   const [tip, setTip] = useState(null)
-  const height = Math.round(width * 0.62)
   const legendH = 54
 
   const features = useMemo(() => (geo ? feature(geo, geo.objects.countries).features : []), [geo])
   const surveyed = useMemo(() => features.filter(f => isoByNumeric[f.id]), [features, isoByNumeric])
+  // height follows the region's shape (wide for Asia-Pacific, tall for Latin America)
+  const height = useMemo(() => {
+    if (!surveyed.length) return Math.round(width * 0.62)
+    const fc = { type: 'FeatureCollection', features: surveyed }
+    const [[, y0], [, y1]] = geoPath(geoMercator().fitWidth(width - 24, fc)).bounds(fc)
+    return Math.round(Math.min(Math.max(y1 - y0 + 24, width * 0.55), width * 1.1, 760))
+  }, [surveyed, width])
 
   const { path, projection } = useMemo(() => {
     const proj = geoMercator()
@@ -50,7 +56,7 @@ export default function ChoroplethMap({ geo, values, isoByNumeric, countryName, 
              rows: v ? [{ name: 'Value', value: format(v.value) },
                         ...(v.se != null ? [{ name: '95% CI', value: `${format(v.value - 1.96 * v.se)} – ${format(v.value + 1.96 * v.se)}` }] : []),
                         { name: 'N', value: v.n?.toLocaleString('en-US') }]
-                      : [{ name: 'Not asked in this wave', value: '' }] })
+                      : [{ name: 'Not surveyed or not asked', value: '' }] })
   }
 
   const gradId = `${uid}-grad`

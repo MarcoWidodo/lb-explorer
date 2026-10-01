@@ -9,29 +9,29 @@ import WaveDotMatrix from '../components/shared/WaveDotMatrix'
 const FEATURES = [
   {
     icon: BarChart3,
-    title: 'Single-Wave Explorer',
-    desc: 'Answers to any question in any wave, compared across countries and by gender, age, education and urban/rural.',
+    title: 'Single-Year Explorer',
+    desc: 'Answers to any question in any survey year, compared across countries and by gender, age, education and town size.',
     path: '/explore',
     color: 'var(--chart-1)',
   },
   {
     icon: TrendingUp,
     title: 'Time-Series Explorer',
-    desc: 'Harmonized questions on one scale across all six waves, by fieldwork year, with regional averages.',
+    desc: 'Every question asked in three or more years, on a real 1995–2024 year axis, with regional averages over fixed country sets.',
     path: '/trends',
     color: 'var(--chart-3)',
   },
   {
     icon: Globe2,
     title: 'Choropleth Map',
-    desc: 'One number per country, from any question in any wave, on a map of the region.',
+    desc: 'One number per country, from any question in any year, on a map of Latin America.',
     path: '/map',
     color: 'var(--chart-4)',
   },
   {
     icon: GitCompareArrows,
     title: 'Correlations Explorer',
-    desc: 'How two questions move together, across countries or among respondents within a country.',
+    desc: 'How two questions move together in a survey year, across countries or among respondents within a country.',
     path: '/correlations',
     color: 'var(--chart-5)',
   },
@@ -120,7 +120,7 @@ export default function Home() {
               transition={{ delay: 0.35, duration: 0.7, ease: [0.25, 0.4, 0.25, 1] }}
             >
               {manifest.survey.name.replace(/ Survey$/, '')}{' '}
-              <span className="hero-title-accent">Survey Explorer</span>
+              <span className="hero-title-accent">Explorer</span>
             </motion.h1>
 
             <motion.p
@@ -130,8 +130,8 @@ export default function Home() {
               transition={{ delay: 0.55, duration: 0.6 }}
             >
               Explore {y1 - y0 + 1} years of public opinion ({y0}–{y1}) from {totalN.toLocaleString('en-US')} interviews
-              in {totalCountries} countries in {manifest.survey.region}: democratic values, institutional trust,
-              political participation and economic perceptions.
+              in {totalCountries} countries of {manifest.survey.region}: support for democracy, trust in institutions,
+              the economy, corruption and crime, {manifest.n_questions} questions in all, every one asked in at least three survey years.
             </motion.p>
 
             <motion.div
@@ -155,7 +155,7 @@ export default function Home() {
             >
               <div className="hero-stat">
                 <span className="hero-stat-num"><CountUp target={nWaves} duration={1} /></span>
-                <span className="hero-stat-label">Survey Waves</span>
+                <span className="hero-stat-label">Survey {manifest.unit_label === 'Year' ? 'Years' : 'Waves'}</span>
               </div>
               <div className="hero-stat-divider" />
               <div className="hero-stat">
@@ -192,7 +192,7 @@ export default function Home() {
             viewport={{ once: true, amount: 0.5 }}
             transition={{ duration: 0.6 }}
           >
-            {nWaves === 6 ? 'Six' : nWaves} Waves of Data
+            {manifest.unit_label === 'Year' ? `${nWaves} Survey Years, ${y0}–${y1}` : `${nWaves === 6 ? 'Six' : nWaves} Waves of Data`}
           </motion.h2>
 
           <motion.p
@@ -202,7 +202,7 @@ export default function Home() {
             viewport={{ once: true, amount: 0.5 }}
             transition={{ delay: 0.15, duration: 0.6 }}
           >
-            Survey coverage across {totalCountries} countries, {y0}–{y1}. Hover a dot for the fieldwork year and sample size.
+            Survey coverage across {totalCountries} countries, {y0}–{y1}. Hover a dot for the sample size{manifest.unit_label === 'Year' ? '' : ' and fieldwork year'}.
           </motion.p>
 
           <motion.div

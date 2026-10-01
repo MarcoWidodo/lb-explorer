@@ -4,7 +4,7 @@ import { feature } from 'topojson-client'
 import { api, useData } from '../../context/DataProvider'
 
 // Stagger order for draw-in (roughly geographic sweep)
-const DRAW_ORDER = ['JP', 'KR', 'CN', 'HK', 'TW', 'MN', 'PH', 'VN', 'TH', 'KH', 'MM', 'MY', 'SG', 'ID', 'IN', 'AU']
+const DRAW_ORDER = ['MX', 'GT', 'SV', 'HN', 'NI', 'CR', 'PA', 'DO', 'VE', 'CO', 'EC', 'PE', 'BO', 'BR', 'PY', 'UY', 'AR', 'CL']
 
 
 export default function GlobeCanvas({ width = 420, height = 420 }) {
@@ -35,7 +35,7 @@ export default function GlobeCanvas({ width = 420, height = 420 }) {
           }
         })
 
-        // Sort ABS features by draw order
+        // Sort surveyed countries by draw order
         absFeatures.sort((a, b) =>
           DRAW_ORDER.indexOf(a._a2) - DRAW_ORDER.indexOf(b._a2)
         )
@@ -63,7 +63,7 @@ export default function GlobeCanvas({ width = 420, height = 420 }) {
     const projection = geoOrthographic()
       .translate([width / 2, height / 2])
       .scale(width * 0.42)
-      .rotate([-110, -10, 0]) // centered on Asia-Pacific
+      .rotate([75, 15, 0]) // centred on Latin America
       .clipAngle(90)
 
     const path = geoPath(projection, ctx)
@@ -115,7 +115,7 @@ export default function GlobeCanvas({ width = 420, height = 420 }) {
       ctx.stroke()
       ctx.globalAlpha = 1
 
-      // Non-ABS countries (gray fill)
+      // Countries not surveyed (gray fill)
       otherFeatures.forEach(f => {
         ctx.beginPath()
         path(f)
@@ -123,7 +123,7 @@ export default function GlobeCanvas({ width = 420, height = 420 }) {
         ctx.fill()
       })
 
-      // ABS countries with draw-in animation
+      // Surveyed countries with draw-in animation
       absFeatures.forEach((f, i) => {
         const countryStart = DRAW_IN_START + i * DRAW_IN_STAGGER
         const progress = Math.min(1, Math.max(0, (elapsed - countryStart) / DRAW_IN_DURATION))

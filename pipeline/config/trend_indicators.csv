@@ -1,5 +1,23 @@
-harmonized_id,success_codes,allow_mean,note
-dem_preference,1,FALSE,"% saying democracy is always preferable (the standard headline). The three answers are not an ordered scale, so no mean."
-dem_confidence,1,TRUE,"% saying democracy is capable of solving the problems of our society"
-public_svc_police,1;2,TRUE,"% saying it is easy or very easy to get help from the police"
-party_closeness,2;3,TRUE,"% feeling somewhat or very close to their party (among partisans)"
+variable,success_codes,featured,note,default_set
+A_001_001,1,1,"% saying democracy is preferable to any other form of government (the standard headline). The three answers are not an ordered scale, so no mean.",
+A_003_031,1;2,1,"% very or rather satisfied with how democracy works",
+A_002_021,1;2,1,"% strongly agree or agree that democracy may have problems but is the best system",
+A_003_021,mean,1,"Mean on the 1–10 scale (1 = not democratic … 10 = totally democratic)",
+A_009_021,1,1,"% saying there can be no democracy without political parties",
+A_014_031,1,1,"% saying there can be no democracy without a national Congress",
+B_001_101,1,1,"% saying the country is governed for the benefit of powerful interests",
+B_006_061,1,1,"% approving of the president's government",
+H_002_011,1;2,1,"% with a lot of or some confidence in Congress",
+H_002_031,1;2,1,"% with a lot of or some confidence in the government",
+H_002_041,1;2,1,"% with a lot of or some confidence in the judiciary",
+H_002_051,1;2,1,"% with a lot of or some confidence in the president",
+H_002_101,1;2,1,"% with a lot of or some confidence in the Church",
+H_002_111,1;2,1,"% with a lot of or some confidence in the police",
+H_002_161,1;2,1,"% with a lot of or some confidence in the armed forces",bal14af
+H_002_241,1;2,1,"% with a lot of or some confidence in political parties",
+H_001_011,1,1,"% saying most people can be trusted",
+A_007_001,1;2,1,"% very or fairly interested in politics",
+A_007_071,mean,1,"Mean on the 0–10 left–right scale; 1998 (a 1–10 scale) is left out of the trend",
+D_001_001,1;2,1,"% saying the country's economic situation is very good or good",
+G_002_011,1,1,"% who know of an act of corruption (by themselves or a relative)",
+I_001_001_victim,1,1,"% who were, or have a relative who was, a victim of crime in the last 12 months",

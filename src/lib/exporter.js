@@ -99,9 +99,20 @@ export async function exportPNG(opts, filename) {
   download(blob, filename)
 }
 
-/* ── Tidy CSV (rule 9 of the project's trend-analysis instructions) ── */
-export const TIDY_COLUMNS = ['indicator', 'variable', 'success_codes', 'base', 'country_set', 'wave', 'year',
+/* ── Tidy CSV (rule 9 of the project's trend-analysis instructions) ──
+   indicator, variable, success_codes, base, country_set, year, iso3, country, value, n, n_countries,
+   plus group and se. Surveys with waves add a `wave` column. Shares keep one decimal, means three. */
+export const TIDY_COLUMNS = ['indicator', 'variable', 'success_codes', 'base', 'country_set', 'year',
   'iso3', 'country', 'group', 'value', 'se', 'n', 'n_countries']
+export const TIDY_COLUMNS_WAVES = ['indicator', 'variable', 'success_codes', 'base', 'country_set', 'wave', 'year',
+  'iso3', 'country', 'group', 'value', 'se', 'n', 'n_countries']
+
+function tidyRound(r) {
+  if (!('value' in r) || r.success_codes == null) return r
+  const isMean = r.success_codes === 'mean'
+  const k = isMean ? 1000 : 10, ks = isMean ? 10000 : 100
+  return { ...r, value: r.value == null ? r.value : Math.round(r.value * k) / k, se: r.se == null ? r.se : Math.round(r.se * ks) / ks }
+}
 
 export function exportCSV(rows, filename, columns = TIDY_COLUMNS) {
   const esc = (v) => {
@@ -109,7 +120,7 @@ export function exportCSV(rows, filename, columns = TIDY_COLUMNS) {
     const s = typeof v === 'number' ? String(Math.round(v * 10000) / 10000) : String(v)
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
-  const text = [columns.join(','), ...rows.map(r => columns.map(c => esc(r[c])).join(','))].join('\n')
+  const text = [columns.join(','), ...rows.map(tidyRound).map(r => columns.map(c => esc(r[c])).join(','))].join('\n')
   download(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }), filename)
 }
 

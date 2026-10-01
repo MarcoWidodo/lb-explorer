@@ -1,17 +1,19 @@
-abs_code,iso2,iso3,iso_numeric,name
-1,JP,JPN,392,Japan
-2,HK,HKG,344,Hong Kong
-3,KR,KOR,410,South Korea
-4,CN,CHN,156,China
-5,MN,MNG,496,Mongolia
-6,PH,PHL,608,Philippines
-7,TW,TWN,158,Taiwan
-8,TH,THA,764,Thailand
-9,ID,IDN,360,Indonesia
-10,SG,SGP,702,Singapore
-11,VN,VNM,704,Vietnam
-12,KH,KHM,116,Cambodia
-13,MY,MYS,458,Malaysia
-14,MM,MMR,104,Myanmar
-15,AU,AUS,036,Australia
-18,IN,IND,356,India
+lb_code,iso2,iso3,iso_numeric,name
+32,AR,ARG,032,Argentina
+68,BO,BOL,068,Bolivia
+76,BR,BRA,076,Brazil
+152,CL,CHL,152,Chile
+170,CO,COL,170,Colombia
+188,CR,CRI,188,Costa Rica
+214,DO,DOM,214,Dominican Republic
+218,EC,ECU,218,Ecuador
+222,SV,SLV,222,El Salvador
+320,GT,GTM,320,Guatemala
+340,HN,HND,340,Honduras
+484,MX,MEX,484,Mexico
+558,NI,NIC,558,Nicaragua
+591,PA,PAN,591,Panama
+600,PY,PRY,600,Paraguay
+604,PE,PER,604,Peru
+858,UY,URY,858,Uruguay
+862,VE,VEN,862,Venezuela

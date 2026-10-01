@@ -8,7 +8,7 @@ import { TYPE_LABEL } from './VariablePicker'
  * Collapsible "Question details" panel used by every view.
  * rec: a variable file ({ codes, labels, nr, nr_labels, offscale }) or a trend item.
  */
-export default function DetailPanel({ title = 'Question details', code, question, section, type, rec, countries, harmonized, extra, defaultOpen = false }) {
+export default function DetailPanel({ title = 'Question details', code, question, section, type, rec, countries, countriesLabel = 'Asked in', harmonized, extra, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
   const { countryName } = useData()
   if (!question) return null
@@ -51,7 +51,7 @@ export default function DetailPanel({ title = 'Question details', code, question
             </div>
           )}
           {countries && (
-            <div className="detail-note"><strong>Asked in:</strong> {countries.map(countryName).join(', ')}</div>
+            <div className="detail-note"><strong>{countriesLabel}:</strong> {countries.map(countryName).join(', ')}</div>
           )}
           {harmonized && (
             <div className="detail-note">
@@ -62,5 +62,31 @@ export default function DetailPanel({ title = 'Question details', code, question
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Latinobarómetro question history: years asked, the original question number in
+ * each year's questionnaire (from the harmonisation crosswalk), the Spanish title,
+ * comparability notes, and a link to the trend.
+ */
+export function QuestionHistory({ entry, rec, showTrendLink = true }) {
+  if (!entry) return null
+  const qn = rec?.qn || {}
+  return (
+    <>
+      {rec?.title_es && <div className="detail-note"><strong>Spanish title:</strong> {rec.title_es}</div>}
+      {entry.note && <div className="detail-note"><strong>Comparability:</strong> {entry.note}</div>}
+      {entry.tb && <div className="detail-note"><strong>Trend:</strong> {entry.tb.note}</div>}
+      <div className="detail-responses-label" style={{ marginTop: '0.75rem' }}>Asked in {entry.y.length} survey years · question number</div>
+      <div className="detail-qn-grid">
+        {entry.y.map(y => (
+          <span key={y} className="detail-qn"><span className="detail-response-code">{y}</span><span className="detail-source-var">{qn[y] ?? '—'}</span></span>
+        ))}
+      </div>
+      {showTrendLink && entry.tb?.years !== 'all' && (
+        <div className="detail-note">See this question over time in the <Link to={`/trends?item=${entry.id}`} className="detail-link">Time-Series Explorer</Link>.</div>
+      )}
+    </>
   )
 }

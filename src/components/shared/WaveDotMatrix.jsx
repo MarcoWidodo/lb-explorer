@@ -6,6 +6,20 @@ import { useData } from '../../context/DataProvider'
 export default function WaveDotMatrix() {
   const { manifest } = useData()
   const WAVES = manifest.waves.map(w => ({ num: w.id, label: w.label, years: w.years }))
+  // Many units (survey years): a dense calendar grid in which years without a survey are thin gaps
+  const dense = WAVES.length > 8
+  const columns = useMemo(() => {
+    if (!dense) return WAVES.map(w => ({ ...w, gap: false }))
+    const out = []
+    for (let y = WAVES[0].num; y <= WAVES[WAVES.length - 1].num; y++) {
+      const w = WAVES.find(x => x.num === y)
+      out.push(w ? { ...w, gap: false } : { num: y, gap: true })
+    }
+    return out
+  }, [manifest]) // eslint-disable-line react-hooks/exhaustive-deps
+  const template = dense
+    ? `minmax(var(--dm-label, 150px), auto) ${columns.map(c => (c.gap ? '7px' : 'minmax(15px, 1fr)')).join(' ')}`
+    : undefined
   const [hoveredWave, setHoveredWave] = useState(null)
   const [hoveredCountry, setHoveredCountry] = useState(null)
 
@@ -23,18 +37,21 @@ export default function WaveDotMatrix() {
 
   return (
     <div className="dot-matrix-wrap">
-      <div className="dot-matrix" style={{ '--n-waves': WAVES.length }}>
+      <div className={`dot-matrix-scroll${dense ? ' dense' : ''}`}>
+      <div className={`dot-matrix${dense ? ' dense' : ''}`} style={{ '--n-waves': WAVES.length, gridTemplateColumns: template }}>
         {/* Header row: wave labels */}
         <div className="dot-matrix-corner" />
-        {WAVES.map(w => (
+        {columns.map(w => w.gap ? <div key={`g${w.num}`} className="dot-matrix-gapcol head" title={`No survey in ${w.num}`} /> : (
           <div
             key={w.num}
             className={`dot-matrix-col-header${hoveredWave === w.num ? ' active' : ''}`}
             onMouseEnter={() => setHoveredWave(w.num)}
             onMouseLeave={() => setHoveredWave(null)}
           >
-            <span className="dot-matrix-wave-num">W{w.num}</span>
-            <span className="dot-matrix-wave-years">{w.years}</span>
+            {dense
+              ? <span className="dot-matrix-wave-num">’{String(w.num).slice(2)}</span>
+              : <><span className="dot-matrix-wave-num">W{w.num}</span>
+                  <span className="dot-matrix-wave-years">{w.years}</span></>}
 
             {/* Tooltip on wave header hover */}
             <AnimatePresence>
@@ -46,7 +63,7 @@ export default function WaveDotMatrix() {
                   exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <div className="dot-matrix-tooltip-title">Wave {w.num} ({w.years})</div>
+                  <div className="dot-matrix-tooltip-title">{dense ? w.label : `Wave ${w.num} (${w.years})`}</div>
                   <div className="dot-matrix-tooltip-count">{hoveredWaveCountries.length} countries</div>
                   <div className="dot-matrix-tooltip-chips">
                     {hoveredWaveCountries.map(c => (
@@ -89,7 +106,8 @@ export default function WaveDotMatrix() {
             </div>
 
             {/* Dots for each wave */}
-            {WAVES.map((w, ci) => {
+            {columns.map((w, ci) => {
+              if (w.gap) return <div key={`g${w.num}`} className="dot-matrix-gapcol" />
               const present = c.waves.includes(w.num)
               const isHighlighted =
                 (hoveredWave === w.num) ||
@@ -102,7 +120,7 @@ export default function WaveDotMatrix() {
                 <div
                   key={w.num}
                   className={`dot-matrix-cell${isHighlighted ? ' highlighted' : ''}${isDimmed ? ' dimmed' : ''}`}
-                  title={present ? `${c.name}, ${w.label}: ${c.n[w.num].year}, N = ${c.n[w.num].n.toLocaleString('en-US')}` : `${c.name}: not surveyed in ${w.label}`}
+                  title={present ? `${c.name}, ${w.label}${dense ? '' : `: ${c.n[w.num].year}`}, N = ${c.n[w.num].n.toLocaleString('en-US')}` : `${c.name}: not surveyed in ${w.label}`}
                 >
                   <motion.div
                     className={`dot-matrix-dot${present ? ' filled' : ' empty'}`}
@@ -113,7 +131,7 @@ export default function WaveDotMatrix() {
                     whileInView={{ scale: 1 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{
-                      delay: 0.1 + ci * 0.08 + ri * 0.02,
+                      delay: dense ? 0.05 + ci * 0.02 + ri * 0.015 : 0.1 + ci * 0.08 + ri * 0.02,
                       duration: 0.35,
                       type: 'spring',
                       stiffness: 500,
@@ -127,6 +145,7 @@ export default function WaveDotMatrix() {
         ))}
       </div>
 
+      </div>
       {/* Legend */}
       <div className="dot-matrix-legend">
         <span className="dot-matrix-legend-item">
@@ -137,6 +156,7 @@ export default function WaveDotMatrix() {
           <span className="dot-matrix-dot empty" />
           Not surveyed
         </span>
+        {dense && manifest.gaps_note && <span className="dot-matrix-legend-item">{manifest.gaps_note}</span>}
       </div>
     </div>
   )
